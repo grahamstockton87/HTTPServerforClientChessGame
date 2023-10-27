@@ -1,0 +1,8 @@
+﻿  main.cpp
+C:\Users\graha\PycharmProjects\chess\HTTPServerforClientChessGame\HTTPServerforClientChessGame\main.cpp(80,61): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\graha\PycharmProjects\chess\HTTPServerforClientChessGame\HTTPServerforClientChessGame\main.cpp(85,42): warning C4244: 'argument': conversion from 'std::streamsize' to 'int', possible loss of data
+C:\Users\graha\PycharmProjects\chess\HTTPServerforClientChessGame\HTTPServerforClientChessGame\main.cpp(93,69): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\graha\PycharmProjects\chess\HTTPServerforClientChessGame\HTTPServerforClientChessGame\main.cpp(105,69): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\graha\PycharmProjects\chess\HTTPServerforClientChessGame\HTTPServerforClientChessGame\main.cpp(120,64): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\graha\PycharmProjects\chess\HTTPServerforClientChessGame\HTTPServerforClientChessGame\main.cpp(126,62): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+  HTTPServerforClientChessGame.vcxproj -> C:\Users\graha\PycharmProjects\chess\HTTPServerforClientChessGame\x64\Debug\HTTPServerforClientChessGame.exe

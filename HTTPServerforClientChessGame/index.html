@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Game</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Graham Stockton Chess Game Web Version</h1>
+    </header>
+    <script>
+        const socket = new WebSocket("ws:192.168.1.129:27021");
+
+        socket.onopen = (event) => {
+            setTimeout(() => {
+                console.log('Connected to the server.');
+                socket.send('Hello, server! This is a message from the client.');
+            }, 1000); // 1 second delay
+        };
+        socket.addEventListener('message', (event) => {
+            const message = event.data;
+            console.log('Received message:', message);
+        });
+
+        socket.addEventListener('error', (event) => {
+            console.error('WebSocket error:', event);
+        });
+
+        socket.addEventListener('close', (event) => {
+            if (event.wasClean) {
+                console.log(`WebSocket closed cleanly, code=${event.code}, reason=${event.reason}`);
+            } else {
+                console.error('WebSocket connection abruptly closed');
+            }
+        });
+
+        function sendServer(actorMoved) {
+            actorMoved.tilePos = { x: actorMoved.sprite.x / scale, y: actorMoved.sprite.y / scale };
+            const actorMovedJSON = {
+                id: actorMoved.id,
+                pos: {
+                    x: actorMoved.tilePos.x,
+                    y: actorMoved.tilePos.y
+                }
+            };
+            // Serialize the JavaScript object to a JSON-formatted string
+            const writeJSONData = JSON.stringify(actorMovedJSON, null, 4);
+            // Now, writeJSONData contains the JSON-formatted string that can be sent to the server
+            socket.onopen = (event) => {
+                setTimeout(() => {
+                    socket.send(writeJSONData);
+                }, 1000); // 1 second delay
+            };
+        }
+
+
+        class vec2 {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+
+            }
+            // Addition operator
+            add(otherVec) {
+                return new vec2(this.x + otherVec.x, this.y + otherVec.y);
+            }
+
+            // Subtraction operator
+            subtract(otherVec) {
+                return new vec2(this.x - otherVec.x, this.y - otherVec.y);
+            }
+            // Subtraction operator
+            divide(otherVec) {
+                return new vec2(this.x / otherVec.x, this.y / otherVec.y);
+            }
+            // Subtraction operator
+            multiply(otherVec) {
+                return new vec2(this.x * otherVec.x, this.y * otherVec.y);
+            }
+            // Convert to a primitive value for addition
+            valueOf() {
+                return this.x + this.y;
+            }
+        }
+
+        class Actor {
+            constructor(pos, image_path, behavior, white, scale) {
+                this.pos = pos;
+                this.image_path = image_path;
+                this.behavior = behavior;
+                this.white = white;
+                this.scale = scale;
+                this.id = null; // Initialize id to null
+                this.sprite = null;
+                this.has_moved = false;
+                this.canTake = false;
+            }
+            is_inside_box(box) {
+                if (box.x <= this.sprite.x + scale / 2 && this.sprite.x + scale / 2 <= box.x + scale && box.y <= this.sprite.y + scale / 2 && this.sprite.y + scale / 2 <= box.y + scale) {
+                    //console.log("Tile Box pos: ", box.x / scale, box.y / scale, "actor pos", this.sprite.x, this.sprite.y);
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            snapToTile(tiles_list) { //modifies sprite pos x and y to nearest tile
+                for (let i = 0; i < 8; i++) {
+                    for (let g = 0; g < 8; g++) {
+                        if (this.is_inside_box(tiles_list[i][g].pos)) {
+                            this.sprite.x = tiles_list[i][g].pos.x;
+                            this.sprite.y = tiles_list[i][g].pos.y;
+                            return tiles_list[i][g];
+                        }
+                    }
+                }
+            }
+        }
+
+        class Tile {
+            constructor(pos, state) {
+                this.pos = pos
+                this.state = state
+            }
+        }
+        function createActorsList(scale) {
+            const actorsList = [];
+            // WHITE ACTORS
+            for (let i = 0; i < 8; i++) {
+                actorsList.push(
+                    new Actor(new vec2(i * scale, scale * 6), 'https://i.imgur.com/ocXlpho.png', 1, true, scale)
+                );
+            }
+
+            actorsList.push(
+                new Actor(new vec2(0, scale * 7), 'https://i.imgur.com/cGPgCtF.png', 2, true, scale)
+            );
+            actorsList.push(
+                new Actor(new vec2(scale, scale * 7), 'https://i.imgur.com/dXMZN19.png', 3, true, scale)
+            );
+            actorsList.push(
+                new Actor(new vec2(scale * 2, scale * 7), 'https://i.imgur.com/iQMvXBR.png', 4, true, scale)
+            );
+            actorsList.push(
+                new Actor(new vec2(scale * 3, scale * 7), 'https://i.imgur.com/kyf1Qsl.png', 5, true, scale)
+            );
+            actorsList.push(
+                new Actor(new vec2(scale * 4, scale * 7), 'https://i.imgur.com/iQEWzd9.png', 6, true, scale)
+            );
+            actorsList.push(
+                new Actor(new vec2(scale * 5, scale * 7), 'https://i.imgur.com/iQMvXBR.png', 4, true, scale)
+            );
+            actorsList.push(
+                new Actor(new vec2(scale * 6, scale * 7), 'https://i.imgur.com/dXMZN19.png', 3, true, scale)
+            );
+            actorsList.push(
+                new Actor(new vec2(scale * 7, scale * 7), 'https://i.imgur.com/cGPgCtF.png', 2, true, scale)
+            );
+
+            for (let i = 0; i < 8; i++) {
+                actorsList.push(
+                    new Actor(new vec2(i * scale, scale), 'https://i.imgur.com/yR5LbO1.png', 1, false, scale)
+                );
+            }
+
+            actorsList.push(
+                new Actor(new vec2(0, 0), 'https://i.imgur.com/3T15gNC.png', 2, false, scale)
+            );
+            actorsList.push(
+                new Actor(new vec2(scale, 0), 'https://i.imgur.com/InFr2uR.png', 3, false, scale)
+            );
+            actorsList.push(
+                new Actor(new vec2(scale * 2, 0), 'https://i.imgur.com/sRsIKSr.png', 4, false, scale)
+            );
+            actorsList.push(
+                new Actor(new vec2(scale * 3, 0), 'https://i.imgur.com/rg1JeRp.png', 5, false, scale)
+            );
+            actorsList.push(
+                new Actor(new vec2(scale * 4, 0), 'https://i.imgur.com/wmLQt1x.png', 6, false, scale)
+            );
+            actorsList.push(
+                new Actor(new vec2(scale * 5, 0), 'https://i.imgur.com/sRsIKSr.png', 4, false, scale)
+            );
+            actorsList.push(
+                new Actor(new vec2(scale * 6, 0), 'https://i.imgur.com/InFr2uR.png', 3, false, scale)
+            );
+            actorsList.push(
+                new Actor(new vec2(scale * 7, 0), 'https://i.imgur.com/3T15gNC.png', 2, false, scale)
+            );
+
+            for (let i = 0; i < actorsList.length; i++) {
+                actorsList[i].id = i;
+            }
+
+            return actorsList;
+        }
+        function initializeTilesList(scale) {
+            // Initialize a 2D array of tiles with all elements set to null
+            const tilesList = new Array(8).fill(null).map(() => new Array(8).fill(null));
+
+            // Create the tiles and set their colors based on their positions
+            for (let a = 0; a < 8; a++) {
+                for (let i = 0; i < 8; i++) {
+                    tilesList[i][a] = {
+                        pos: { x: i * scale, y: a * scale },
+                        state: false,
+                        scale: scale,
+                    };
+                }
+            }
+
+            return tilesList;
+        }
+        function updateBoard(tilesList, actorsList) {
+            for (let i of tilesList) {
+                for (let a of i) {
+                    a.state = false;
+                }
+            }
+            for (let actor of actorsList) {
+                if (actor && actor.sprite) {
+                    var clipped = gameToTilePos(new vec2(actor.sprite.x, actor.sprite.y));
+                    tilesList[clipped.x][clipped.y].state = true;
+                }
+            }
+        }
+        function isMoveValid(d, b, hasMoved, w) { //d = distanceMoved; b = actor behavior; f = first move (pawn); w = bool white;
+            if (w) {
+                d.y *= -1;
+            }
+            //console.log("d=", d, "b=", b, "hasmoved=", hasMoved, "w=", w);
+            if (d.x === 0 && d.y === 0) {
+                return false; // if hasn't moved, return false
+            } else if (b === 1) { // PAWN
+                
+                if (d.x === 0) {
+                    if ((!hasMoved && d.y === 2 || d.y === 1) || (hasMoved && d.y === 1)) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                } else if (d.x === d.y) { // If move is diagonal
+                    canTake = true;
+                    return true;
+                } else {
+                    return false;
+                }
+            } else if (b === 2) { //
+                if (d.x === 0 || d.y === 0) {
+                    return true;
+                } else { // illegal move
+                    return false;
+                }
+            } else if (b === 3) { // knight
+                d.x = Math.abs(d.x);
+                d.y = Math.abs(d.y);
+                if ((d.x === 1 && d.y === 2) ||
+                    (d.x === 2 && d.y === 2) ||
+                    (d.y === 1 && d.x === 2)) { // move and snap to tile
+                    return true;
+                } else { // illegal move
+                    return false;
+                }
+            } else if (b === 4) { // bishop diagonal
+                if (Math.abs(d.x) === Math.abs(d.y)) { // both x and y move, and both even
+                    return true;
+                } else { // illegal move
+                    return false;
+                }
+            } else if (b === 5) { // queen
+                d.x = Math.abs(d.x);
+                d.y = Math.abs(d.y);
+                if ((d.x === 0 || d.y === 0) ||
+                    d.x === d.y) {
+                    return true;
+                } else { // illegal move
+                    return false;
+                }
+            } else if (b === 6) { // king
+                d.x = Math.abs(d.x);
+                d.y = Math.abs(d.y);
+                if (d.x <= 1 && d.y <= 1) {
+                    return true;
+                } else { // illegal move
+                    return false;
+                }
+            }    
+        }
+        function tileDistance(a, b) { //a = tile a pos, b = tile b pos; Return distance between two points
+            return gameToTilePos(new vec2(b.x - a.x, b.y - a.y));
+        }
+        function actorAtTile(tile, actors_list, currentID) { // currentID is id to exclude 
+            for (let actor of actors_list) {
+                if (actor.sprite.x === tile.pos.x && actor.sprite.y === tile.pos.y && actor.id !== currentID) { //has already snapped to tile
+                    return actor;
+                }
+            }
+        }
+        function actorFromID(actors_list, id) {
+            for (let actor of actors_list) {
+                if (actor.id === id) {
+                    return actor;
+                }
+            }
+        }
+
+        // Convert the is_inside_box method
+
+        function clip(num, scale) {
+            return (num >= 0) ? Math.floor(num / scale) * scale : Math.floor(num / scale - 1) * scale;
+        }
+        function gameToTilePos(pos) { //converts game pos VEC2 to grid pos EX> (20,24) = (0,0);
+            return new vec2(clip(pos.x, scale) / scale, clip(pos.y, scale) / scale);
+        }
+        function tileAtSprite(x, y, tiles_list) { //pos x, pos y
+            
+            return tiles_list[clip(x, scale) / scale][clip(y, scale) / scale];
+        }
+        function distanceTraveled(x, y) {
+            x1 = gameToTilePos(x.pos);
+            y1 = gameToTilePos(y.pos);
+            return (new vec2(y1.x - x1.x, y1.y - x1.y));
+        }
+        function removeActorById(actorsList, idToRemove) {
+            const indexToRemove = actorsList.findIndex(actor => actor.id === idToRemove);
+            if (indexToRemove !== -1) {
+                const actorToRemove = actorsList.splice(indexToRemove, 1)[0];
+                actorToRemove.sprite.destroy();
+                //console.log("removing actor id=  ", actorToRemove.id, "pos = ", actorToRemove.sprite.x, actorToRemove.sprite.y);
+            }
+        }
+
+        // Define configuration for the Phaser game
+        var config = {
+            type: Phaser.AUTO, // Automatically choose WebGL or Canvas rendering
+            width: 1100,        // Width of the game canvas
+            height: 750,       // Height of the game canvas
+            scene: {
+                preload: preload, // Function to preload game assets
+                create: create,
+            }
+        };
+        var scale = 80;
+        // Create a Phaser game instance
+        var game = new Phaser.Game(config);
+        var actors_list = createActorsList(scale);
+        var tiles_list = initializeTilesList(scale);
+        
+        // Define a variable to hold the currently clicked sprite
+
+        // Preload function: Load game assets
+        function preload() {
+            // You can preload images, audio, and other assets here
+            this.load.image('board', 'https://i.imgur.com/cDhfKk7.jpg');
+            for (let i = 0; i < actors_list.length; i++) {
+                const actor = actors_list[i];
+                this.load.image((actor.id).toString(), actor.image_path);
+            }
+        }
+        function clip(num, scale) {
+            return (num >= 0) ? Math.floor(num / scale) * scale : (Math.floor(num / scale) - 1) * scale;
+        }
+
+
+        // GLOBAL VARIABLES ----------------------------------------------------------------------------------------------
+
+
+        var isSpriteClicked = false;
+        let clickedSprite = null;
+        var moving = false;
+        var currentID = 0;
+        let startingTile = null;
+        let destinationTile = null;
+        var distance = new vec2(0, 0);
+        var canTake = false;
+
+        // GLOBAL VARIABLES ----------------------------------------------------------------------------------------------
+
+
+
+        // Create function: Set up game objects and logic
+        function create() {
+
+            // Create an image using the preloaded image
+            var board_image = this.add.sprite(0, 0, 'board');
+            board_image.setOrigin(0, 0);
+            board_image.setScale(scale * 8 / board_image.width, scale * 8 / board_image.height);
+            // Optionally, you can add interactive behavior to the image
+
+            // Loop through actors_list to create sprites for each actor
+            for (let actor of actors_list) {
+                actor.sprite = this.add.sprite(actor.pos.x, actor.pos.y, actor.id.toString());
+                actor.sprite.setOrigin(0, 0);
+                actor.sprite.setScale(scale / actor.sprite.width, scale / actor.sprite.height);
+                actor.sprite.setInteractive(); // Make the sprite interactive
+
+                // Use a closure to capture the specific sprite associated with each starting_actor
+                actor.sprite.on('pointerdown', function (sprite) {
+                    return function () {
+                        startingTile = tileAtSprite(actor.sprite.x, actor.sprite.y, tiles_list);
+                        starting_actor = actorAtTile(startingTile, actors_list, null);
+                        moving = true;
+                    };
+                }(actor.sprite)); // Pass x_image as an argument to the closure
+                // Listen for mouse move events to update the clicked sprite's position
+                this.input.on('pointermove', function (pointer) {
+                    // Check if a sprite is clicked (clickedSprite is not null)
+                    if (moving) {
+                        starting_actor.sprite.x = pointer.x - scale / 2;
+                        starting_actor.sprite.y = pointer.y - scale / 2;
+                    }
+                });
+                // Listen for mouse button release events
+                this.input.on('pointerup', function () {
+                    if (moving) {
+                        moving = false;
+                        destinationTile = starting_actor.snapToTile(tiles_list);
+                        //console.log("destination state ", destinationTile.state, destinationTile.pos);
+                        if (!isMoveValid(distanceTraveled(startingTile, destinationTile), starting_actor.behavior, starting_actor.has_moved, starting_actor.white)) {
+                            starting_actor.sprite.x = startingTile.pos.x;
+                            starting_actor.sprite.y = startingTile.pos.y;
+                            //return to tile
+                        } else { // if move is valid
+                            startingTile.state = false;
+                            if (destinationTile.state === true) { // if destination tile is occupied
+                                var actorToRemove = actorAtTile(destinationTile, actors_list, starting_actor.id);
+                                
+                                removeActorById(actors_list, actorToRemove.id);
+                               
+                            }
+                            if (starting_actor.behavior === 1 && !starting_actor.has_moved) {
+                                starting_actor.has_moved = true;
+                            }
+                            
+                        }
+
+                        socket.onopen = (event) => {
+                            socket.send('Hello, server! This is a message from the client.');
+                        };
+                    }
+                    startingTile = null;
+                    destinationTile = null;
+                    updateBoard(tiles_list, actors_list, scale);
+                });
+
+            }
+            updateBoard(tiles_list, actors_list, scale);
+
+        }
+
+    </script>
+
+    <footer>
+        <p>&copy; 2023 Graham Stockton</p>
+    </footer>
+</body>
+</html>
